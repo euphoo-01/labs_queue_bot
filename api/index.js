@@ -40,25 +40,28 @@ async function updateCell(row, colLetter, value) {
 // === Добавление колонки с сегодняшней датой (если её нет) ===
 async function ensureTodayColumn(headers) {
 	const today = new Date()
-		.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" })
-		.replace("/", "."); // "08.10"
+		.toLocaleDateString("ru-RU", {
+			timeZone: "Europe/Minsk", // Используем Minsk для EEST
+			day: "2-digit",
+			month: "2-digit",
+		})
+		.replace("/", ".");
+	console.log("Current date (Europe/Minsk):", today); // Отладка
 	let colIndex = headers.indexOf(today);
 
-	// если нет колонки с сегодняшней датой → добавляем новую справа
 	if (colIndex === -1) {
-		const newColIndex = headers.length; // номер новой колонки (0-based)
-		const newColLetter = columnLetter(newColIndex); // конвертируем в букву
+		const newColIndex = headers.length;
+		const newColLetter = columnLetter(newColIndex);
 		await sheets.spreadsheets.values.update({
 			spreadsheetId,
 			range: `${SHEET_MAIN}!${newColLetter}1`,
 			valueInputOption: "USER_ENTERED",
-			requestBody: { values: [[`'${today}`]] }, // добавляем апостроф
+			requestBody: { values: [[`'${today}`]] },
 		});
 		colIndex = newColIndex;
 	}
 
-	const colLetter = columnLetter(colIndex);
-	return { today, colLetter };
+	return { today, colLetter: columnLetter(colIndex) };
 }
 
 // конвертер индекса в букву колонки (A, B, ..., AA, AB, ...)
