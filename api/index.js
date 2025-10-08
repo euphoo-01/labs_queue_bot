@@ -3,7 +3,6 @@ import { google } from "googleapis";
 import dotenv from "dotenv";
 dotenv.config();
 
-// Google Sheets Setup (ваш код без изменений)
 const auth = new google.auth.GoogleAuth({
 	credentials: {
 		client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
@@ -14,6 +13,13 @@ const auth = new google.auth.GoogleAuth({
 const sheets = google.sheets({ version: "v4", auth });
 
 const bot = new Bot(process.env.BOT_TOKEN);
+
+// Инициализация бота (асинхронно)
+(async () => {
+	await bot.init(); // Получаем информацию о боте от Telegram
+	console.log("Bot initialized with username:", bot.botInfo?.username);
+})();
+
 const spreadsheetId = process.env.SPREADSHEET_ID;
 const SHEET_MAIN = "Лист1";
 const SHEET_LOGS = "Логи";
@@ -250,22 +256,28 @@ bot.command("skip", async (ctx) => {
 	}
 });
 
-// Экспорт webhook для Vercel
 export default async function handler(req, res) {
+	console.log("Received request:", req.method, req.url, req.body); // Детальная отладка
 	if (req.method === "POST") {
 		try {
-			await bot.handleUpdate(req.body); // Обрабатываем update от Telegram
+			if (!req.body) throw new Error("No body received from Telegram");
+			console.log("Processing update:", JSON.stringify(req.body, null, 2)); // Логируем тело
+			if (!req.body.message && !req.body.edited_message) {
+				throw new Error("No message or edited_message in body");
+			}
+			await bot.handleUpdate(req.body); // Обрабатываем обновление
 			res.status(200).json({ ok: true });
 		} catch (error) {
-			console.error("Webhook error:", error);
-			res.status(500).json({ error: "Webhook failed" });
+			console.error("Webhook error:", error.message, error.stack); // Полная трассировка
+			res.status(500).json({ error: "Webhook failed", details: error.message });
 		}
+	} else if (req.method === "GET") {
+		res.status(200).json({ status: "Webhook is active", method: "POST only" });
 	} else {
 		res.status(405).json({ error: "Method not allowed" });
 	}
 }
 
-// Запуск бота локально (для теста)
 if (require.main === module) {
 	bot.start();
 	console.log("✅ Бот запущен в polling-режиме (для локального теста)");
