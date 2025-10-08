@@ -1,0 +1,255 @@
+import { Bot } from "grammy";
+import { google } from "googleapis";
+import dotenv from "dotenv";
+dotenv.config();
+
+// === Google Sheets Setup ===
+const auth = new google.auth.GoogleAuth({
+	credentials: {
+		client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+		private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+	},
+	scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+});
+const sheets = google.sheets({ version: "v4", auth });
+
+const bot = new Bot(process.env.BOT_TOKEN);
+const spreadsheetId = process.env.SPREADSHEET_ID;
+const SHEET_MAIN = "Лист1";
+const SHEET_LOGS = "Логи";
+
+// === Вспомогательные функции ===
+async function getSheetData() {
+	const res = await sheets.spreadsheets.values.get({
+		spreadsheetId,
+		range: SHEET_MAIN,
+	});
+	return res.data.values;
+}
+
+// обновляем конкретную ячейку
+async function updateCell(row, colLetter, value) {
+	await sheets.spreadsheets.values.update({
+		spreadsheetId,
+		range: `${SHEET_MAIN}!${colLetter}${row}`,
+		valueInputOption: "USER_ENTERED",
+		requestBody: { values: [[value]] },
+	});
+}
+
+// === Добавление колонки с сегодняшней датой (если её нет) ===
+async function ensureTodayColumn(headers) {
+	const today = new Date()
+		.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" })
+		.replace("/", "."); // "08.10"
+	let colIndex = headers.indexOf(today);
+
+	// если нет колонки с сегодняшней датой → добавляем новую справа
+	if (colIndex === -1) {
+		const newColIndex = headers.length; // номер новой колонки (0-based)
+		const newColLetter = columnLetter(newColIndex); // конвертируем в букву
+		await sheets.spreadsheets.values.update({
+			spreadsheetId,
+			range: `${SHEET_MAIN}!${newColLetter}1`,
+			valueInputOption: "USER_ENTERED",
+			requestBody: { values: [[`'${today}`]] }, // добавляем апостроф
+		});
+		colIndex = newColIndex;
+	}
+
+	const colLetter = columnLetter(colIndex);
+	return { today, colLetter };
+}
+
+// конвертер индекса в букву колонки (A, B, ..., AA, AB, ...)
+function columnLetter(colIndex) {
+	let temp = colIndex;
+	let letter = "";
+	while (temp >= 0) {
+		letter = String.fromCharCode((temp % 26) + 65) + letter;
+		temp = Math.floor(temp / 26) - 1;
+	}
+	return letter;
+}
+
+// логирование
+async function logAction({ command, subject, id, fio, user, result }) {
+	const now = new Date().toLocaleString("ru-RU", { timeZone: "Europe/Moscow" });
+	const values = [[now, command, subject, id, fio, user, result]];
+	await sheets.spreadsheets.values.append({
+		spreadsheetId,
+		range: SHEET_LOGS,
+		valueInputOption: "USER_ENTERED",
+		insertDataOption: "INSERT_ROWS",
+		requestBody: { values },
+	});
+}
+
+// === /queue ===
+bot.command("queue", async (ctx) => {
+	try {
+		const args = ctx.match?.trim().split(/\s+/) || [];
+		if (args.length === 0) {
+			await ctx.reply("Используй: /queue <предмет> [id]");
+			return;
+		}
+
+		const subject = args[0].toUpperCase();
+		const id = args[1];
+		const user = ctx.from.username
+			? `@${ctx.from.username}`
+			: ctx.from.first_name;
+
+		const data = await getSheetData();
+		console.log("Raw data from sheet:", data); // Логирование для отладки
+		const headers = data[0];
+		const { today, colLetter } = await ensureTodayColumn(headers);
+
+		// === Если указан ID — отметка посещения ===
+		if (id) {
+			const startIndex = data.findIndex((r) => r[0] === id && r[1]);
+			if (startIndex === -1) {
+				await ctx.reply("❌ Не найден студент с таким ID.");
+				return;
+			}
+			const rowIndex = data.findIndex(
+				(r, index) => index >= startIndex && r[2]?.toUpperCase() === subject
+			);
+			if (rowIndex === -1) {
+				await ctx.reply("❌ Предмет не найден для этого студента.");
+				return;
+			}
+
+			const fio = data[startIndex][1]; // Берем ФИО из первой строки группы
+			await updateCell(rowIndex + 1, colLetter, "'+");
+			await ctx.reply(`✅ Отмечено: ${fio} (${subject}, ${today})`);
+
+			await logAction({
+				command: "/queue",
+				subject,
+				id,
+				fio,
+				user,
+				result: "'+",
+			});
+			return;
+		}
+
+		// === Если без ID — вывод очереди ===
+		const subjectRows = data
+			.slice(1)
+			.filter((r) => r[2]?.toUpperCase() === subject);
+		console.log("Filtered subjectRows:", subjectRows); // Логирование для отладки
+		if (subjectRows.length === 0) {
+			await ctx.reply(
+				`❌ Предмет "${subject}" не найден в таблице. Проверьте правильность названия.`
+			);
+			return;
+		}
+
+		// Группируем строки по студентам, используя текущую или предыдущую строку для ФИО и №
+		const queueMap = new Map();
+		data.slice(1).forEach((r, index) => {
+			if (r[2]?.toUpperCase() === subject) {
+				// Используем текущую строку, если заполнены A и B, иначе ищем предыдущую
+				let studentId = r[0];
+				let studentName = r[1];
+				if (!studentId || !studentName) {
+					// Ищем предыдущую строку с заполненными данными
+					let prevIndex = index - 1;
+					while (
+						prevIndex >= 0 &&
+						(!data[prevIndex][0] || !data[prevIndex][1])
+					) {
+						prevIndex--;
+					}
+					if (prevIndex >= 0) {
+						studentId = data[prevIndex][0];
+						studentName = data[prevIndex][1];
+					}
+				}
+				if (studentId && studentName) {
+					console.log(
+						`Processing: ID=${studentId}, Name=${studentName}, Subject=${r[2]}, Index=${index}`
+					); // Отладка
+					const key = `${studentId}_${studentName}`; // Уникальный ключ для студента
+					if (!queueMap.has(key)) {
+						queueMap.set(key, { id: studentId, name: studentName, count: 0 });
+					}
+					const entry = queueMap.get(key);
+					entry.count += r
+						.slice(3)
+						.filter((v) => v === "+" || v === "-").length;
+				}
+			}
+		});
+
+		const queue = Array.from(queueMap.values());
+		if (queue.length === 0) {
+			await ctx.reply(`⚠️ Нет данных для очереди по предмету "${subject}".`);
+			return;
+		}
+		queue.sort((a, b) => a.count - b.count);
+
+		let text = `📋 Очередь по *${subject}*:\n\n`;
+		queue.forEach((s, i) => {
+			text += `${i + 1}. ${s.name} (id: ${s.id}) — ${s.count} посещ.\n`;
+		});
+
+		await ctx.reply(text, { parse_mode: "Markdown" });
+	} catch (err) {
+		console.error("Error in /queue:", err.message);
+		console.error("Full error:", JSON.stringify(err, null, 2));
+		await ctx.reply("⚠️ Ошибка при обработке команды /queue.");
+	}
+});
+
+// === /skip ===
+bot.command("skip", async (ctx) => {
+	try {
+		const args = ctx.match?.trim().split(/\s+/) || [];
+		if (args.length < 2) {
+			await ctx.reply("Используй: /skip <предмет> <id>");
+			return;
+		}
+
+		const subject = args[0].toUpperCase();
+		const id = args[1];
+		const user = ctx.from.username
+			? `@${ctx.from.username}`
+			: ctx.from.first_name;
+
+		const data = await getSheetData();
+		const headers = data[0];
+		const { today, colLetter } = await ensureTodayColumn(headers);
+
+		const rowIndex = data.findIndex(
+			(r) => r[0] === id && r[2]?.toUpperCase() === subject
+		);
+		if (rowIndex === -1) {
+			await ctx.reply("❌ Не найден студент с таким ID и предметом.");
+			return;
+		}
+
+		const fio = data[rowIndex][1];
+		await updateCell(rowIndex + 1, colLetter, "'-");
+		await ctx.reply(`🚫 Пропуск: ${fio} (${subject}, ${today})`);
+
+		await logAction({
+			command: "/skip",
+			subject,
+			id,
+			fio,
+			user,
+			result: "'-",
+		});
+	} catch (err) {
+		console.error("Error in /skip:", err.message);
+		console.error("Full error:", JSON.stringify(err, null, 2));
+		await ctx.reply("⚠️ Ошибка при обработке команды /skip.");
+	}
+});
+
+// === Запуск ===
+bot.start();
+console.log("✅ Бот запущен...");

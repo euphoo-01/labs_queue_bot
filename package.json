@@ -1,0 +1,18 @@
+{
+	"name": "labs_queue",
+	"version": "1.0.0",
+	"description": "Телеграм-бот для формирования очереди на лабораторные работы",
+	"license": "ISC",
+	"author": "euphoo-01",
+	"type": "module",
+	"main": "index.js",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1",
+		"start": "node index.js"
+	},
+	"dependencies": {
+		"dotenv": "^17.2.3",
+		"googleapis": "^161.0.0",
+		"grammy": "^1.38.3"
+	}
+}

@@ -1,0 +1,5 @@
+.env
+keys/
+keys/*
+node_modules/
+node_modul
