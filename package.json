@@ -4,7 +4,6 @@
 	"description": "Телеграм-бот для формирования очереди на лабораторные работы",
 	"license": "ISC",
 	"author": "euphoo-01",
-	"type": "module",
 	"main": "index.js",
 	"scripts": {
 		"test": "echo \"Error: no test specified\" && exit 1",

@@ -3,7 +3,7 @@ import { google } from "googleapis";
 import dotenv from "dotenv";
 dotenv.config();
 
-// === Google Sheets Setup ===
+// Google Sheets Setup (ваш код без изменений)
 const auth = new google.auth.GoogleAuth({
 	credentials: {
 		client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
@@ -250,6 +250,23 @@ bot.command("skip", async (ctx) => {
 	}
 });
 
-// === Запуск ===
-bot.start();
-console.log("✅ Бот запущен...");
+// Экспорт webhook для Vercel
+export default async function handler(req, res) {
+	if (req.method === "POST") {
+		try {
+			await bot.handleUpdate(req.body); // Обрабатываем update от Telegram
+			res.status(200).json({ ok: true });
+		} catch (error) {
+			console.error("Webhook error:", error);
+			res.status(500).json({ error: "Webhook failed" });
+		}
+	} else {
+		res.status(405).json({ error: "Method not allowed" });
+	}
+}
+
+// Запуск бота локально (для теста)
+if (require.main === module) {
+	bot.start();
+	console.log("✅ Бот запущен в polling-режиме (для локального теста)");
+}
