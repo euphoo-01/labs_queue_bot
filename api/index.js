@@ -158,6 +158,10 @@ bot.command("queue", async (ctx) => {
 			if (r[2]?.toUpperCase() === subject) {
 				let studentId = r[0];
 				let studentName = r[1];
+				while (!studentId || !studentName || index !== 0) {
+					studentId = data[0][index--];
+					studentName = data[1][index--];
+				}
 				if (studentId && studentName) {
 					console.log(
 						`Processing: ID=${studentId}, Name=${studentName}, Subject=${r[2]}, Index=${index}`
