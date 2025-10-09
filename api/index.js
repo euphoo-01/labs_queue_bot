@@ -185,7 +185,7 @@ bot.command("queue", async (ctx) => {
 					entry.count += r
 						.slice(4)
 						.filter((v) => v === "+" || v === "-").length;
-					entry.count += r[start_row - 1];
+					entry.count += Number(r[start_row - 1]);
 				}
 			}
 		});
