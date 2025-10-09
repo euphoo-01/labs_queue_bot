@@ -3,7 +3,7 @@ import { google } from "googleapis";
 import dotenv from "dotenv";
 dotenv.config();
 
-const start_row = 4; // Отсчет с 0
+const start_col = 4; // Отсчет с 0
 
 const auth = new google.auth.GoogleAuth({
 	credentials: {
@@ -156,23 +156,8 @@ bot.command("queue", async (ctx) => {
 		const queueMap = new Map();
 		data.slice(1).forEach((r, index) => {
 			if (r[2]?.toUpperCase() === subject) {
-				// Используем текущую строку, если заполнены A и B, иначе ищем предыдущую
 				let studentId = r[0];
 				let studentName = r[1];
-				if (!studentId || !studentName) {
-					// Ищем предыдущую строку с заполненными данными
-					let prevIndex = index - 1;
-					while (
-						prevIndex >= 0 &&
-						(!data[prevIndex][0] || !data[prevIndex][1])
-					) {
-						prevIndex--;
-					}
-					if (prevIndex >= 0) {
-						studentId = data[prevIndex][0];
-						studentName = data[prevIndex][1];
-					}
-				}
 				if (studentId && studentName) {
 					console.log(
 						`Processing: ID=${studentId}, Name=${studentName}, Subject=${r[2]}, Index=${index}`
@@ -183,10 +168,11 @@ bot.command("queue", async (ctx) => {
 					}
 					const entry = queueMap.get(key);
 					entry.count += r
-						.slice(4)
+						.slice(3)
 						.filter((v) => v === "+" || v === "-").length;
-					if (r[start_row - 1]) {
-						entry.count += Number(r[start_row - 1]);
+					const init_number_of_labs = Number(r[start_ - 1]);
+					if (!Number.isNaN(init_number_of_labs) && init_number_of_labs > 0) {
+						entry.count += init_number_of_labs;
 					}
 				}
 			}
