@@ -158,9 +158,10 @@ bot.command("queue", async (ctx) => {
 			if (r[2]?.toUpperCase() === subject) {
 				let studentId = r[0];
 				let studentName = r[1];
-				while (!studentId || !studentName || index !== 0) {
-					studentId = data[0][index--];
-					studentName = data[1][index--];
+				let cur_index = index;
+				while (!studentId || !studentName || cur_index !== 0) {
+					studentId = data[0][cur_index--];
+					studentName = data[1][cur_index--];
 				}
 				if (studentId && studentName) {
 					console.log(
