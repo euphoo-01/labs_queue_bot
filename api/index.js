@@ -159,20 +159,20 @@ bot.command("queue", async (ctx) => {
 				// Используем текущую строку, если заполнены A и B, иначе ищем предыдущую
 				let studentId = r[0];
 				let studentName = r[1];
-				// if (!studentId || !studentName) {
-				// 	// Ищем предыдущую строку с заполненными данными
-				// 	let prevIndex = index - 1;
-				// 	while (
-				// 		prevIndex >= 0 &&
-				// 		(!data[prevIndex][0] || !data[prevIndex][1])
-				// 	) {
-				// 		prevIndex--;
-				// 	}
-				// 	if (prevIndex >= 0) {
-				// 		studentId = data[prevIndex][0];
-				// 		studentName = data[prevIndex][1];
-				// 	}
-				// }
+				if (!studentId || !studentName) {
+					// Ищем предыдущую строку с заполненными данными
+					let prevIndex = index - 1;
+					while (
+						prevIndex >= 0 &&
+						(!data[prevIndex][0] || !data[prevIndex][1])
+					) {
+						prevIndex--;
+					}
+					if (prevIndex >= 0) {
+						studentId = data[prevIndex][0];
+						studentName = data[prevIndex][1];
+					}
+				}
 				if (studentId && studentName) {
 					console.log(
 						`Processing: ID=${studentId}, Name=${studentName}, Subject=${r[2]}, Index=${index}`
