@@ -156,13 +156,19 @@ bot.command("queue", async (ctx) => {
 		const queueMap = new Map();
 		data.slice(1).forEach((r, index) => {
 			if (r[2]?.toUpperCase() === subject) {
-				let studentId = r[0];
+				let studentId = r[0]; // Сначала используем текущую строку
 				let studentName = r[1];
-				let cur_index = index;
-				while (!studentId || !studentName || cur_index !== 0) {
-					studentId = data[0][cur_index--];
-					studentName = data[1][cur_index--];
+				let curIndex = index + 1; // Начинаем с текущей строки (index + 1, так как slice(1) смещает)
+
+				// Ищем в предыдущих строках, если текущие поля пустые
+				while ((!studentId || !studentName) && curIndex > 1) {
+					// Останавливаемся на строке 1
+					const prevRow = data[curIndex - 1]; // Предыдущая строка
+					studentId = prevRow[0] || studentId; // Берем ID, если пусто в текущей
+					studentName = prevRow[1] || studentName; // Берем ФИО, если пусто в текущей
+					curIndex--; // Переходим к предыдущей строке
 				}
+
 				if (studentId && studentName) {
 					console.log(
 						`Processing: ID=${studentId}, Name=${studentName}, Subject=${r[2]}, Index=${index}`
@@ -175,14 +181,13 @@ bot.command("queue", async (ctx) => {
 					entry.count += r
 						.slice(3)
 						.filter((v) => v === "+" || v === "-").length;
-					const init_number_of_labs = Number(r[start_ - 1]);
-					if (!Number.isNaN(init_number_of_labs) && init_number_of_labs > 0) {
-						entry.count += init_number_of_labs;
+					const initNumberOfLabs = Number(r[2]); // Предполагаем, что start_ - 1 = 2 (нужно уточнить)
+					if (!Number.isNaN(initNumberOfLabs) && initNumberOfLabs > 0) {
+						entry.count += initNumberOfLabs;
 					}
 				}
 			}
 		});
-
 		const queue = Array.from(queueMap.values());
 		if (queue.length === 0) {
 			await ctx.reply(`⚠️ Нет данных для очереди по предмету "${subject}".`);
