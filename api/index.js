@@ -181,7 +181,7 @@ bot.command("queue", async (ctx) => {
 					entry.count += r
 						.slice(3)
 						.filter((v) => v === "+" || v === "-").length;
-					const initNumberOfLabs = Number(r[2]); // Предполагаем, что start_ - 1 = 2 (нужно уточнить)
+					const initNumberOfLabs = Number(r[start_col - 1]); // Предполагаем, что start_ - 1 = 2 (нужно уточнить)
 					if (!Number.isNaN(initNumberOfLabs) && initNumberOfLabs > 0) {
 						entry.count += initNumberOfLabs;
 					}
