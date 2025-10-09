@@ -3,6 +3,8 @@ import { google } from "googleapis";
 import dotenv from "dotenv";
 dotenv.config();
 
+const start_row = 4; // Отсчет с 0
+
 const auth = new google.auth.GoogleAuth({
 	credentials: {
 		client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
@@ -157,20 +159,20 @@ bot.command("queue", async (ctx) => {
 				// Используем текущую строку, если заполнены A и B, иначе ищем предыдущую
 				let studentId = r[0];
 				let studentName = r[1];
-				if (!studentId || !studentName) {
-					// Ищем предыдущую строку с заполненными данными
-					let prevIndex = index - 1;
-					while (
-						prevIndex >= 0 &&
-						(!data[prevIndex][0] || !data[prevIndex][1])
-					) {
-						prevIndex--;
-					}
-					if (prevIndex >= 0) {
-						studentId = data[prevIndex][0];
-						studentName = data[prevIndex][1];
-					}
-				}
+				// if (!studentId || !studentName) {
+				// 	// Ищем предыдущую строку с заполненными данными
+				// 	let prevIndex = index - 1;
+				// 	while (
+				// 		prevIndex >= 0 &&
+				// 		(!data[prevIndex][0] || !data[prevIndex][1])
+				// 	) {
+				// 		prevIndex--;
+				// 	}
+				// 	if (prevIndex >= 0) {
+				// 		studentId = data[prevIndex][0];
+				// 		studentName = data[prevIndex][1];
+				// 	}
+				// }
 				if (studentId && studentName) {
 					console.log(
 						`Processing: ID=${studentId}, Name=${studentName}, Subject=${r[2]}, Index=${index}`
@@ -181,8 +183,9 @@ bot.command("queue", async (ctx) => {
 					}
 					const entry = queueMap.get(key);
 					entry.count += r
-						.slice(3)
+						.slice(4)
 						.filter((v) => v === "+" || v === "-").length;
+					entry.count += r[start_row - 1];
 				}
 			}
 		});
